@@ -4,9 +4,9 @@ Originally written by Peter Eriksson <pen@lysator.liu.se> around 1987, and
 slightly updated for modern compilers around 2015. Parts of the code (evald.c)
 written by Anders Furuhed based on an example in the book Advanced C.
 
-All bets are off regarding this code - it was written a long time ago and very probably
-is full of bugs and strange assumtions due to the fact that it was created on a Prime/PRIMOS
-supermini computer and was orignally written in pure K&R C.
+All bets are off regarding this code - it was written a long time ago and very
+probably is full of bugs and strange assumtions due to the fact that it was
+originally created on a Prime/PRIMOS supermini computer and written in pure K&R C.
 
 - Peter
 
