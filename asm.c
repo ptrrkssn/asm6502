@@ -21,6 +21,8 @@
 #include "symbols.h"
 
 
+extern char version[];
+
 #define LSIZE        32
 
 #define CHECK        0
@@ -54,7 +56,7 @@ int      current_address = 0;
 int      origin_address  = NOT_SET;
 char *   memory_image    = NULL;
 int      memory_length   = 0;
-
+int      verbose         = 0;
 
 jmp_buf  error_env;
 jmp_buf  undecld_symbol;
@@ -67,6 +69,9 @@ int      insource          = 0;
 
 int      uc_labels         = 0;
 int      hbitchar          = 0;
+
+char *   av0;
+char *   filename;
 
 FILE *   infile;
 FILE *   outfile;
@@ -93,11 +98,15 @@ display_source(void)
 void
 error(char *errmsg)
 {
-   display_source();
-   printf("*** Error #%d, at line #%d is: %s\n", ++errcount, lineno, errmsg);
-   if (listfile != NULL && listfile != stdout)
-      fprintf(listfile, "*** Error #%d: %s\n", errcount, errmsg);
-   longjmp(error_env, 1);
+    ++errcount;
+    
+    fprintf(stderr, "%s: %s:%u: error: %s\n", av0, filename, lineno, errmsg);
+
+    display_source();
+    if (listfile != NULL && listfile != stdout)
+	fprintf(listfile, "*** Error #%d: %s\n", errcount, errmsg);
+    
+    longjmp(error_env, 1);
 }
 
 
@@ -676,8 +685,8 @@ write_outfile(FILE *outfile)
 int
 main(int argc, char **argv)
 {
-   char     temp[129];
-   char     line[256];
+   char     temp[2048];
+   char     line[1024];
    char     label[32];
    char     name[32];
    char     mode[128];
@@ -685,26 +694,51 @@ main(int argc, char **argv)
    int      endflag;
    int      value;
    int      length;
+   int      i, j;
+   
 
+   av0 = argv[0];
+   for (i = 1; i < argc && argv[i][0] == '-'; i++)
+       for (j = 1; argv[i][j]; j++)
+	   switch (argv[i][j])
+	   {
+	     case 'h':
+	       printf("Usage: %s [-h] [-V] [<in-file>]\n", argv[0]);
+	       exit(0);
 
-   puts("[ASM/6502 version 1.10]");
-
-   if (argc < 2)
+	     case 'v':
+	       ++verbose;
+	       break;
+	       
+	     case 'V':
+	       printf("[ASM6502 version %s - Copyright (c) 1987-2015 Peter Eriksson <pen@lysator.liu.se>]\n",
+		      version);
+	       break;
+	       
+	     default:
+	       fprintf(stderr, "%s: -%c: Invalid switch\n", argv[0], argv[i][j]);
+	       exit(1);
+	   }
+   
+   if (i == argc)
    {
-      infile     = stdin;
-      listfile   = stdout;
-      outfile    = stdout;
-      entryfile  = stdout;
-      externfile = stdout;
+       filename = "<stdin>";
+       infile     = stdin;
+       listfile   = stdout;
+       outfile    = stdout;
+       entryfile  = stdout;
+       externfile = stdout;
    }
    else
    {
-      /*
-      ** ASM source file
-      */
-      if ((infile = fopen(argv[1], "r")) == NULL)
+       filename = strdup(argv[i]);
+       
+       /*
+       ** ASM source file
+       */
+       if ((infile = fopen(argv[i], "r")) == NULL)
       {
-         strcpy(temp, argv[1]);
+         strcpy(temp, argv[i]);
          strcat(temp, ".asm");
          if ((infile = fopen(temp, "r")) == NULL)
          {
@@ -733,7 +767,7 @@ main(int argc, char **argv)
       /*
       ** ENTrypoints file
       */
-      strcpy(temp, argv[1]);
+      strcpy(temp, argv[i]);
       if ((ptr = strchr(temp, '.')) != NULL)
          strcpy(ptr, ".ent");
       else
@@ -748,7 +782,7 @@ main(int argc, char **argv)
       /*
       ** EXTernal declarations file.
       */
-      strcpy(temp, argv[1]);
+      strcpy(temp, argv[i]);
       if ((ptr = strchr(temp, '.')) != NULL)
          strcpy(ptr, ".ext");
       else
@@ -763,7 +797,7 @@ main(int argc, char **argv)
       /*
       ** LISTing file
       */
-      strcpy(temp, argv[1]);
+      strcpy(temp, argv[i]);
       if ((ptr = strchr(temp, '.')) != NULL)
          strcpy(ptr, ".list");
       else
@@ -900,13 +934,14 @@ END_OF_FILE:
    solve_forward();
    write_outfile(outfile);
 
-   printf("\nAssembly status: %02d errors in %d source lines\n",
-      errcount, lineno);
+   if (verbose)
+       fprintf(stderr, "*** Assembly status: %d errors in %d source lines\n",
+	      errcount, lineno);
 
    if (listfile != NULL && listfile != stdout)
    {
       fprintf(listfile,
-         "\nAssembly status: %02d errors in %d source lines\n",
+         "\nAssembly status: %d errors in %d source lines\n",
          errcount, lineno);
       fclose(listfile);
    }
@@ -916,5 +951,5 @@ END_OF_FILE:
    if (infile != stdin)
       fclose(infile);
 
-   return 0;
+   return (errcount > 0 ? 1 : 0);
 }
